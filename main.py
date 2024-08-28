@@ -11,7 +11,7 @@ gene_length = 8
 mutation_rate = 0.05
 max_generations = 100
 cell_size = 50
-diagram_width = 300
+diagram_width = 900  # Breiter für mehrere Diagramme
 window_width = gene_length * cell_size + 100 + diagram_width
 window_height = pop_size * cell_size + 100
 fps = 1  # Frames per second, to control the speed of generation updates
@@ -31,6 +31,24 @@ def fitness(individual):
 def average_fitness(population):
     fitness_scores = np.array([fitness(ind) for ind in population])
     return np.mean(fitness_scores)
+
+
+# Maximale Fitness der Population
+def max_fitness(population):
+    fitness_scores = np.array([fitness(ind) for ind in population])
+    return np.max(fitness_scores)
+
+
+# Minimale Fitness der Population
+def min_fitness(population):
+    fitness_scores = np.array([fitness(ind) for ind in population])
+    return np.min(fitness_scores)
+
+
+# Genetische Vielfalt der Population (Anzahl unterschiedlicher Genotypen)
+def diversity(population):
+    unique_genotypes = {tuple(ind) for ind in population}
+    return len(unique_genotypes)
 
 
 # Auswahl der Eltern basierend auf Fitness
@@ -83,8 +101,6 @@ def evolve_population(population):
 
 # Funktion, um die Population im Fenster darzustellen
 def draw_population(screen, population, generation):
-    screen.fill((255, 255, 255))  # Hintergrund weiß
-
     font = pygame.font.SysFont(None, 36)
     small_font = pygame.font.SysFont(None, 24)
 
@@ -116,20 +132,19 @@ def draw_population(screen, population, generation):
     generation_text = font.render(f'Generation: {generation}', True, (0, 0, 255))
     screen.blit(generation_text, (10, window_height - 40))
 
-    pygame.display.flip()
 
-
-# Funktion, um das Fitness-Diagramm zu aktualisieren und anzuzeigen
-def draw_fitness_chart(fitness_history):
-    fig = pylab.figure(figsize=[3, 5],  # Size of the figure
+# Funktion, um ein Diagramm zu erstellen und in pygame darzustellen
+def create_chart(data, title, xlabel, ylabel, color, ylim=None):
+    fig = pylab.figure(figsize=[3, 2],  # Size of the figure
                        dpi=100,  # DPI (dots per inch)
                        )
     ax = fig.gca()
-    ax.plot(fitness_history, color='blue')
-    ax.set_title('Average Fitness')
-    ax.set_xlabel('Generation')
-    ax.set_ylabel('Fitness')
-    ax.set_ylim(0, gene_length)
+    ax.plot(data, color=color)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if ylim:
+        ax.set_ylim(ylim)
 
     canvas = agg.FigureCanvasAgg(fig)
     canvas.draw()
@@ -138,6 +153,8 @@ def draw_fitness_chart(fitness_history):
 
     size = canvas.get_width_height()
     surf = pygame.image.fromstring(raw_data, size, "RGB")
+
+    plt.close(fig)  # Schließe das Diagramm, um Speicherlecks zu vermeiden
 
     return surf
 
@@ -156,20 +173,40 @@ def genetic_algorithm():
     generation = 0
 
     fitness_history = []
+    max_fitness_history = []
+    min_fitness_history = []
+    diversity_history = []
 
     while running and generation < max_generations:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
+        screen.fill((255, 255, 255))  # Hintergrund weiß
         draw_population(screen, population, generation)
 
         avg_fitness = average_fitness(population)
-        fitness_history.append(avg_fitness)
+        max_fit = max_fitness(population)
+        min_fit = min_fitness(population)
+        diversity_count = diversity(population)
 
-        # Zeichne das Fitness-Diagramm und blende es auf der rechten Seite ein
-        fitness_chart_surf = draw_fitness_chart(fitness_history)
+        fitness_history.append(avg_fitness)
+        max_fitness_history.append(max_fit)
+        min_fitness_history.append(min_fit)
+        diversity_history.append(diversity_count)
+
+        # Zeichne die Diagramme und blende sie im Fenster ein
+        fitness_chart_surf = create_chart(fitness_history, 'Average Fitness', 'Generation', 'Fitness', 'blue', ylim=(0, gene_length))
         screen.blit(fitness_chart_surf, (gene_length * cell_size + 110, 50))
+
+        max_fitness_chart_surf = create_chart(max_fitness_history, 'Max Fitness', 'Generation', 'Fitness', 'green', ylim=(0, gene_length))
+        screen.blit(max_fitness_chart_surf, (gene_length * cell_size + 420, 50))
+
+        min_fitness_chart_surf = create_chart(min_fitness_history, 'Min Fitness', 'Generation', 'Fitness', 'red', ylim=(0, gene_length))
+        screen.blit(min_fitness_chart_surf, (gene_length * cell_size + 110, 300))
+
+        diversity_chart_surf = create_chart(diversity_history, 'Population Diversity', 'Generation', 'Diversity', 'purple')
+        screen.blit(diversity_chart_surf, (gene_length * cell_size + 420, 300))
 
         population = evolve_population(population)
         generation += 1
